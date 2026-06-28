@@ -7,6 +7,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js"
   },
+  "keywords": ["cron", "monitoring", "heartbeat", "devops", "alerting"],
+  "license": "MIT",
   "dependencies": {
     "better-sqlite3": "^11.0.0",
     "dotenv": "^16.0.0",
