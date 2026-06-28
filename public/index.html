@@ -173,7 +173,7 @@
     <div class="logo">❤️ <span>Heartbeat</span> Monitor</div>
     <div>
       <a href="#features">Features</a>
-      <a href="#pricing">Pricing</a>
+      <a href="#how-it-works">How It Works</a>
       <a href="/dashboard.html">Dashboard</a>
     </div>
   </nav>
@@ -199,7 +199,7 @@
         <div><span class="prompt">$</span> <span>crontab -e</span></div>
         <div>&nbsp;</div>
         <div><span class="comment"># Step 2: Append &amp; ping after your job</span></div>
-        <div><span style="color:#ff7b72;">0 3 * * *</span> <span style="color:#79c0ff;">/backup.sh</span> <span style="color:#ffa657;">&&</span> <span style="color:#d2a8ff;">curl -s https://heartbeat.hermes.run/ping/a1b2c3d4</span></div>
+        <div><span style="color:#ff7b72;">0 3 * * *</span> <span style="color:#79c0ff;">/backup.sh</span> <span style="color:#ffa657;">&&</span> <span style="color:#d2a8ff;">curl -s https://heartbeat-monitor-production.up.railway.app/ping/a1b2c3d4</span></div>
         <div>&nbsp;</div>
         <div><span class="comment"># You'll get alerted if it doesn't ping within the grace period</span></div>
         <div><span class="prompt">$</span> <span class="output">✅ Monitor created — you're covered.</span><span class="cursor-blink">▊</span></div>
@@ -213,7 +213,7 @@
       <div class="feature-card">
         <div class="icon">🔌</div>
         <h3>One curl command</h3>
-        <p>No SDK, no agent, no daemon. Just append <code>&& curl https://heartbeat.run/ping/xxx</code> to your cron job. That's it.</p>
+        <p>No SDK, no agent, no daemon. Just append <code>&& curl https://heartbeat-monitor-production.up.railway.app/ping/xxx</code> to your cron job. That's it.</p>
       </div>
       <div class="feature-card">
         <div class="icon">🔔</div>
@@ -235,11 +235,6 @@
         <h3>Auto-recovery detection</h3>
         <p>When a downed monitor starts pinging again, we send a recovery notification. You'll know the problem self-resolved.</p>
       </div>
-      <div class="feature-card">
-        <div class="icon">💰</div>
-        <h3>Free tier, always</h3>
-        <p>One monitor free forever. No credit card required. When you need more, upgrade for $9/month.</p>
-      </div>
     </div>
   </section>
 
@@ -257,14 +252,14 @@
         <div class="step-num">2</div>
         <div class="step-content">
           <h3>Get your ping URL</h3>
-          <p>We give you a unique URL like <code>https://heartbeat.hermes.run/ping/a1b2c3d</code>. Add it to your script.</p>
+          <p>We give you a unique URL like <code>https://heartbeat-monitor-production.up.railway.app/ping/a1b2c3d</code>. Add it to your script.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-content">
           <h3>Add it to your cron job</h3>
-          <p>Append <code>&& curl -s https://heartbeat.run/ping/xxx</code> after your command. That's the whole setup.</p>
+          <p>Append <code>&& curl -s https://heartbeat-monitor-production.up.railway.app/ping/xxx</code> after your command. That's the whole setup.</p>
         </div>
       </div>
       <div class="step">
@@ -273,51 +268,6 @@
           <h3>Get alerted if something breaks</h3>
           <p>If your job doesn't ping back within the grace window, we'll alert you via email, Slack, or Discord — instantly.</p>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="pricing" id="pricing">
-    <h2>Simple pricing</h2>
-    <p class="subtitle">Free tier is free forever. Upgrade when you need more.</p>
-    <div class="pricing-grid">
-      <div class="plan">
-        <div class="plan-name">Free</div>
-        <div class="plan-price">$0 <small>/mo</small></div>
-        <div class="plan-desc">For personal projects and occasional scripts</div>
-        <ul class="plan-features">
-          <li>1 monitor</li>
-          <li>7-day history</li>
-          <li>Email alerts</li>
-          <li>Public status check</li>
-        </ul>
-        <a href="/dashboard.html" class="btn btn-secondary">Get Started</a>
-      </div>
-      <div class="plan popular">
-        <div class="plan-name">Pro</div>
-        <div class="plan-price">$9 <small>/mo</small></div>
-        <div class="plan-desc">For production systems and team workflows</div>
-        <ul class="plan-features">
-          <li>10 monitors</li>
-          <li>30-day history</li>
-          <li>Email + Slack + Discord alerts</li>
-          <li>SMS alerts (coming soon)</li>
-          <li>Team access</li>
-        </ul>
-        <a href="/dashboard.html" class="btn btn-primary">Coming Soon</a>
-      </div>
-      <div class="plan">
-        <div class="plan-name">Business</div>
-        <div class="plan-price">$29 <small>/mo</small></div>
-        <div class="plan-desc">For high-traffic services and multi-team setups</div>
-        <ul class="plan-features">
-          <li>50 monitors</li>
-          <li>1-year history</li>
-          <li>All alert channels</li>
-          <li>Webhook integrations</li>
-          <li>Priority support</li>
-        </ul>
-        <a href="/dashboard.html" class="btn btn-secondary">Coming Soon</a>
       </div>
     </div>
   </section>
