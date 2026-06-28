@@ -17,30 +17,24 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// express.static serves public/index.html at root (landing page)
-
 // ============================================================
 // API Routes
 // ============================================================
 
-/**
- * GET /api/status - Health check for the service itself
- */
 app.get('/api/status', (req, res) => {
+  const total = db.get('SELECT COUNT(*) as count FROM monitors');
+  const active = db.get('SELECT COUNT(*) as count FROM monitors WHERE is_paused = 0');
   res.json({
     status: 'ok',
     version: '1.0.0',
     uptime: process.uptime(),
     monitors: {
-      total: db.prepare('SELECT COUNT(*) as count FROM monitors').get().count,
-      active: db.prepare('SELECT COUNT(*) as count FROM monitors WHERE is_paused = 0').get().count,
+      total: total ? total.count : 0,
+      active: active ? active.count : 0,
     },
   });
 });
 
-/**
- * POST /api/monitors - Create a new monitor
- */
 app.post('/api/monitors', (req, res) => {
   const { name, grace_seconds } = req.body;
 
@@ -52,10 +46,10 @@ app.post('/api/monitors', (req, res) => {
   const slug = crypto.randomBytes(8).toString('hex');
   const grace = Math.max(60, Math.min(86400, parseInt(grace_seconds) || 300));
 
-  db.prepare(`
-    INSERT INTO monitors (id, name, slug, grace_seconds)
-    VALUES (?, ?, ?, ?)
-  `).run(id, name.trim(), slug, grace);
+  db.run(
+    'INSERT INTO monitors (id, name, slug, grace_seconds) VALUES (?, ?, ?, ?)',
+    [id, name.trim(), slug, grace]
+  );
 
   res.status(201).json({
     id,
@@ -67,17 +61,14 @@ app.post('/api/monitors', (req, res) => {
   });
 });
 
-/**
- * GET /api/monitors - List all monitors
- */
 app.get('/api/monitors', (req, res) => {
-  const monitors = db.prepare(`
+  const monitors = db.all(`
     SELECT m.*,
       (SELECT received_at FROM pings WHERE monitor_id = m.id AND status = 'ok' ORDER BY received_at DESC LIMIT 1) as last_ping,
       (SELECT COUNT(*) FROM alerts WHERE monitor_id = m.id AND acknowledged = 0) as unacknowledged_alerts
     FROM monitors m
     ORDER BY m.created_at DESC
-  `).all();
+  `);
 
   res.json(monitors.map(m => ({
     ...m,
@@ -85,17 +76,14 @@ app.get('/api/monitors', (req, res) => {
   })));
 });
 
-/**
- * GET /api/monitors/:id - Get a single monitor
- */
 app.get('/api/monitors/:id', (req, res) => {
-  const monitor = db.prepare(`
+  const monitor = db.get(`
     SELECT m.*,
       (SELECT received_at FROM pings WHERE monitor_id = m.id AND status = 'ok' ORDER BY received_at DESC LIMIT 1) as last_ping,
       (SELECT COUNT(*) FROM pings WHERE monitor_id = m.id) as total_pings,
       (SELECT COUNT(*) FROM alerts WHERE monitor_id = m.id) as total_alerts
     FROM monitors m WHERE m.id = ?
-  `).get(req.params.id);
+  `, [req.params.id]);
 
   if (!monitor) {
     return res.status(404).json({ error: 'Monitor not found' });
@@ -104,71 +92,56 @@ app.get('/api/monitors/:id', (req, res) => {
   res.json(monitor);
 });
 
-/**
- * DELETE /api/monitors/:id - Delete a monitor
- */
 app.delete('/api/monitors/:id', (req, res) => {
-  const monitor = db.prepare('SELECT id FROM monitors WHERE id = ?').get(req.params.id);
+  const monitor = db.get('SELECT id FROM monitors WHERE id = ?', [req.params.id]);
   if (!monitor) {
     return res.status(404).json({ error: 'Monitor not found' });
   }
 
-  db.prepare('DELETE FROM pings WHERE monitor_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM alerts WHERE monitor_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM notification_channels WHERE monitor_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM monitors WHERE id = ?').run(req.params.id);
+  db.run('DELETE FROM pings WHERE monitor_id = ?', [req.params.id]);
+  db.run('DELETE FROM alerts WHERE monitor_id = ?', [req.params.id]);
+  db.run('DELETE FROM notification_channels WHERE monitor_id = ?', [req.params.id]);
+  db.run('DELETE FROM monitors WHERE id = ?', [req.params.id]);
 
   res.json({ message: 'Monitor deleted' });
 });
 
-/**
- * PATCH /api/monitors/:id/pause - Toggle pause
- */
 app.patch('/api/monitors/:id/pause', (req, res) => {
-  const monitor = db.prepare('SELECT id, is_paused FROM monitors WHERE id = ?').get(req.params.id);
+  const monitor = db.get('SELECT id, is_paused FROM monitors WHERE id = ?', [req.params.id]);
   if (!monitor) {
     return res.status(404).json({ error: 'Monitor not found' });
   }
 
   const newState = monitor.is_paused ? 0 : 1;
-  db.prepare('UPDATE monitors SET is_paused = ?, updated_at = datetime(\'now\') WHERE id = ?')
-    .run(newState, req.params.id);
+  db.run("UPDATE monitors SET is_paused = ?, updated_at = datetime('now') WHERE id = ?",
+    [newState, req.params.id]);
 
   res.json({ id: req.params.id, is_paused: newState === 1 });
 });
 
-/**
- * GET /api/monitors/:id/pings - Get ping history
- */
 app.get('/api/monitors/:id/pings', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 1000);
   const offset = parseInt(req.query.offset) || 0;
 
-  const pings = db.prepare(`
-    SELECT * FROM pings WHERE monitor_id = ?
-    ORDER BY received_at DESC LIMIT ? OFFSET ?
-  `).all(req.params.id, limit, offset);
+  const pings = db.all(
+    'SELECT * FROM pings WHERE monitor_id = ? ORDER BY received_at DESC LIMIT ? OFFSET ?',
+    [req.params.id, limit, offset]
+  );
 
   res.json(pings);
 });
 
-/**
- * GET /api/monitors/:id/alerts - Get alert history
- */
 app.get('/api/monitors/:id/alerts', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 1000);
 
-  const alerts = db.prepare(`
-    SELECT * FROM alerts WHERE monitor_id = ?
-    ORDER BY created_at DESC LIMIT ?
-  `).all(req.params.id, limit);
+  const alerts = db.all(
+    'SELECT * FROM alerts WHERE monitor_id = ? ORDER BY created_at DESC LIMIT ?',
+    [req.params.id, limit]
+  );
 
   res.json(alerts);
 });
 
-/**
- * POST /api/monitors/:id/channels - Add notification channel
- */
 app.post('/api/monitors/:id/channels', (req, res) => {
   const { channel_type, config } = req.body;
 
@@ -177,15 +150,15 @@ app.post('/api/monitors/:id/channels', (req, res) => {
     return res.status(400).json({ error: `Invalid channel type. Valid: ${validTypes.join(', ')}` });
   }
 
-  const monitor = db.prepare('SELECT id FROM monitors WHERE id = ?').get(req.params.id);
+  const monitor = db.get('SELECT id FROM monitors WHERE id = ?', [req.params.id]);
   if (!monitor) {
     return res.status(404).json({ error: 'Monitor not found' });
   }
 
-  const result = db.prepare(`
-    INSERT INTO notification_channels (monitor_id, channel_type, config)
-    VALUES (?, ?, ?)
-  `).run(req.params.id, channel_type, JSON.stringify(config));
+  const result = db.run(
+    'INSERT INTO notification_channels (monitor_id, channel_type, config) VALUES (?, ?, ?)',
+    [req.params.id, channel_type, JSON.stringify(config)]
+  );
 
   res.status(201).json({
     id: result.lastInsertRowid,
@@ -194,13 +167,11 @@ app.post('/api/monitors/:id/channels', (req, res) => {
   });
 });
 
-/**
- * GET /api/monitors/:id/channels - List notification channels
- */
 app.get('/api/monitors/:id/channels', (req, res) => {
-  const channels = db.prepare(
-    'SELECT * FROM notification_channels WHERE monitor_id = ?'
-  ).all(req.params.id);
+  const channels = db.all(
+    'SELECT * FROM notification_channels WHERE monitor_id = ?',
+    [req.params.id]
+  );
 
   res.json(channels.map(c => ({
     ...c,
@@ -208,13 +179,9 @@ app.get('/api/monitors/:id/channels', (req, res) => {
   })));
 });
 
-/**
- * DELETE /api/monitors/:id/channels/:channelId - Remove notification channel
- */
 app.delete('/api/monitors/:id/channels/:channelId', (req, res) => {
-  db.prepare('DELETE FROM notification_channels WHERE id = ? AND monitor_id = ?')
-    .run(req.params.channelId, req.params.id);
-
+  db.run('DELETE FROM notification_channels WHERE id = ? AND monitor_id = ?',
+    [req.params.channelId, req.params.id]);
   res.json({ message: 'Channel deleted' });
 });
 
@@ -222,12 +189,8 @@ app.delete('/api/monitors/:id/channels/:channelId', (req, res) => {
 // Heartbeat Endpoints
 // ============================================================
 
-/**
- * GET /ping/:slug - Receive a heartbeat ping
- * This is the URL that users configure in their cron jobs
- */
 app.get('/ping/:slug', (req, res) => {
-  const monitor = db.prepare('SELECT * FROM monitors WHERE slug = ?').get(req.params.slug);
+  const monitor = db.get('SELECT * FROM monitors WHERE slug = ?', [req.params.slug]);
 
   if (!monitor) {
     return res.status(404).json({ error: 'Monitor not found. Check your slug.' });
@@ -237,10 +200,10 @@ app.get('/ping/:slug', (req, res) => {
     return res.json({ status: 'paused', message: 'Monitor is paused' });
   }
 
-  db.prepare(`
-    INSERT INTO pings (monitor_id, source_ip, status)
-    VALUES (?, ?, 'ok')
-  `).run(monitor.id, req.ip || req.connection?.remoteAddress || 'unknown');
+  db.run(
+    "INSERT INTO pings (monitor_id, source_ip, status) VALUES (?, ?, 'ok')",
+    [monitor.id, req.ip || req.connection?.remoteAddress || 'unknown']
+  );
 
   res.json({
     status: 'ok',
@@ -249,30 +212,23 @@ app.get('/ping/:slug', (req, res) => {
   });
 });
 
-/**
- * POST /ping/:slug - Same as GET but via POST
- */
 app.post('/ping/:slug', (req, res) => {
-  // Forward to GET handler
   req.method = 'GET';
   app.handle(req, res);
 });
 
-/**
- * GET /check/:slug - Check current status of a monitor (public)
- */
 app.get('/check/:slug', (req, res) => {
-  const monitor = db.prepare('SELECT * FROM monitors WHERE slug = ?').get(req.params.slug);
+  const monitor = db.get('SELECT * FROM monitors WHERE slug = ?', [req.params.slug]);
 
   if (!monitor) {
     return res.status(404).json({ error: 'Monitor not found' });
   }
 
-  const lastPing = db.prepare(`
+  const lastPing = db.get(`
     SELECT received_at FROM pings
     WHERE monitor_id = ? AND status = 'ok'
     ORDER BY received_at DESC LIMIT 1
-  `).get(monitor.id);
+  `, [monitor.id]);
 
   if (!lastPing) {
     return res.json({
@@ -295,16 +251,24 @@ app.get('/check/:slug', (req, res) => {
 });
 
 // ============================================================
-// Start Server
+// Start Server (async init first)
 // ============================================================
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  ❤️  Heartbeat Monitor v1.0.0`);
-  console.log(`  ─────────────────────────────`);
-  console.log(`  Server:    http://localhost:${PORT}`);
-  console.log(`  Dashboard: http://localhost:${PORT}/dashboard.html`);
-  console.log(`  API:       http://localhost:${PORT}/api/status\n`);
+async function start() {
+  await db.init();
+  
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n  ❤️  Heartbeat Monitor v1.0.0`);
+    console.log(`  ─────────────────────────────`);
+    console.log(`  Server:    http://localhost:${PORT}`);
+    console.log(`  Dashboard: http://localhost:${PORT}/dashboard.html`);
+    console.log(`  API:       http://localhost:${PORT}/api/status\n`);
 
-  // Start background scheduler
-  scheduler.start();
+    scheduler.start();
+  });
+}
+
+start().catch(err => {
+  console.error('Failed to start:', err);
+  process.exit(1);
 });

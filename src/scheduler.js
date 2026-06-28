@@ -7,18 +7,16 @@ const cron = require('node-cron');
 
 class Scheduler {
   constructor() {
-    this.alertedMonitors = new Map(); // track which monitors we've already alerted
+    this.alertedMonitors = new Map();
   }
 
   start() {
-    // Run every 60 seconds
     cron.schedule('* * * * *', () => {
       this.checkMonitors().catch(err => {
         console.error('[Scheduler] Check error:', err.message);
       });
     });
 
-    // Also run cleanup every hour (delete old pings)
     cron.schedule('0 * * * *', () => {
       this.cleanup().catch(err => {
         console.error('[Scheduler] Cleanup error:', err.message);
@@ -30,17 +28,16 @@ class Scheduler {
 
   async checkMonitors() {
     const now = new Date();
-    const monitors = db.prepare('SELECT * FROM monitors WHERE is_paused = 0').all();
+    const monitors = db.all('SELECT * FROM monitors WHERE is_paused = 0');
 
     for (const monitor of monitors) {
-      const lastPing = db.prepare(`
+      const lastPing = db.get(`
         SELECT received_at FROM pings
         WHERE monitor_id = ? AND status = 'ok'
         ORDER BY received_at DESC LIMIT 1
-      `).get(monitor.id);
+      `, [monitor.id]);
 
       if (!lastPing) {
-        // Never received a ping - wait for first one
         continue;
       }
 
@@ -58,17 +55,15 @@ class Scheduler {
           await notifier.sendAlert(monitor, reason);
         }
       } else {
-        // Monitor is healthy - clear alert state if it was down
         if (this.alertedMonitors.has(monitor.id)) {
           const downSince = this.alertedMonitors.get(monitor.id);
           const downDuration = Math.floor((now - downSince) / 1000);
           console.log(`[Scheduler] ${monitor.name} is back UP (was down for ${downDuration}s)`);
 
-          // Log recovery alert
-          db.prepare(`
-            INSERT INTO alerts (monitor_id, alert_type, message)
-            VALUES (?, 'recovery', ?)
-          `).run(monitor.id, `Monitor recovered after ${downDuration}s downtime`);
+          db.run(
+            "INSERT INTO alerts (monitor_id, alert_type, message) VALUES (?, 'recovery', ?)",
+            [monitor.id, `Monitor recovered after ${downDuration}s downtime`]
+          );
 
           this.alertedMonitors.delete(monitor.id);
         }
@@ -77,19 +72,16 @@ class Scheduler {
   }
 
   async cleanup() {
-    // Delete pings older than 30 days
-    const result = db.prepare(`
-      DELETE FROM pings WHERE received_at < datetime('now', '-30 days')
-    `).run();
+    const result = db.run(
+      "DELETE FROM pings WHERE received_at < datetime('now', '-30 days')"
+    );
     if (result.changes > 0) {
       console.log(`[Scheduler] Cleaned up ${result.changes} old ping records`);
     }
 
-    // Delete acknowledged alerts older than 90 days
-    const alertResult = db.prepare(`
-      DELETE FROM alerts WHERE acknowledged = 1
-      AND created_at < datetime('now', '-90 days')
-    `).run();
+    const alertResult = db.run(
+      "DELETE FROM alerts WHERE acknowledged = 1 AND created_at < datetime('now', '-90 days')"
+    );
     if (alertResult.changes > 0) {
       console.log(`[Scheduler] Cleaned up ${alertResult.changes} old alerts`);
     }

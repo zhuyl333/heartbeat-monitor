@@ -9,13 +9,11 @@ class Notifier {
     this.transporters = new Map();
   }
 
-  /**
-   * Send alerts for a failed monitor
-   */
   async sendAlert(monitor, reason) {
-    const channels = db.prepare(
-      'SELECT * FROM notification_channels WHERE monitor_id = ?'
-    ).all(monitor.id);
+    const channels = db.all(
+      'SELECT * FROM notification_channels WHERE monitor_id = ?',
+      [monitor.id]
+    );
 
     if (channels.length === 0) {
       console.log(`[Notifier] No notification channels for ${monitor.name}, skipping alert`);
@@ -33,28 +31,24 @@ class Notifier {
       }
     }
 
-    // Log the alert
-    db.prepare(`
-      INSERT INTO alerts (monitor_id, alert_type, message)
-      VALUES (?, ?, ?)
-    `).run(monitor.id, 'down', message.text);
+    db.run(
+      "INSERT INTO alerts (monitor_id, alert_type, message) VALUES (?, 'down', ?)",
+      [monitor.id, message.text]
+    );
   }
 
   _buildMessage(monitor, reason) {
-    const checkUrl = `https://heartbeat.hermes.run/check/${monitor.slug}`;
     return {
       subject: `⚠️ [Heartbeat] ${monitor.name} is DOWN`,
       text: `Monitor: ${monitor.name}
 Status: DOWN
 Reason: ${reason}
 Last ping: ${monitor.last_ping || 'Never'}
-Grace period: ${monitor.grace_seconds}s
-Check URL: ${checkUrl}`,
+Grace period: ${monitor.grace_seconds}s`,
       html: `<h2>⚠️ ${monitor.name} is DOWN</h2>
 <p><strong>Reason:</strong> ${reason}</p>
 <p><strong>Last ping:</strong> ${monitor.last_ping || 'Never'}</p>
-<p><strong>Grace period:</strong> ${monitor.grace_seconds}s</p>
-<p><a href="${checkUrl}">Check URL</a></p>`
+<p><strong>Grace period:</strong> ${monitor.grace_seconds}s</p>`
     };
   }
 
@@ -80,12 +74,8 @@ Check URL: ${checkUrl}`,
   }
 
   async _sendEmail(config, message) {
-    // For MVP: use console.log and suggest configuring SMTP
     console.log(`[Email Alert] To: ${config.to}`);
-    console.log(`[Email Alert] Subject: ${message.subject}`);
-    console.log(`[Email Alert] Body: ${message.text}`);
 
-    // If SMTP is configured, send for real
     if (process.env.SMTP_HOST) {
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
@@ -98,7 +88,7 @@ Check URL: ${checkUrl}`,
       });
 
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || 'alert@heartbeat.hermes.run',
+        from: process.env.SMTP_FROM || 'alert@heartbeat.railway.app',
         to: config.to,
         subject: message.subject,
         text: message.text,
