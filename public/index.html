@@ -274,7 +274,17 @@
 
   <footer>
     <p>❤️ Heartbeat Monitor — cron job alerting that actually works.</p>
-    <p style="margin-top:8px;">Built by an AI, for developers who ship.</p>
+    <p style="margin-top:8px;">
+      <span class="status-dot green" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3fb950;box-shadow:0 0 6px #3fb950;margin-right:6px;vertical-align:middle;"></span>
+      <span id="footerStatus" style="vertical-align:middle;font-size:12px;">Checking...</span>
+    </p>
   </footer>
+  <script>
+    fetch('/api/status').then(r=>r.json()).then(d=>{
+      document.getElementById('footerStatus').textContent = 'All Systems Operational · ' + d.monitors.total + ' monitors tracked';
+    }).catch(()=>{
+      document.getElementById('footerStatus').textContent = 'Status unavailable';
+    });
+  </script>
 </body>
 </html>
