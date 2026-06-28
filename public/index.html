@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heartbeat Monitor — Cron Job Alerting That Actually Works</title>
+  <meta name="description" content="Dead-simple cron job monitoring. Get a unique ping URL, add it to your script, and we'll alert you if your job ever fails to report.">
+  <style>
+    :root {
+      --bg: #0a0c10;
+      --card: #111418;
+      --border: #1e252e;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --red: #f85149;
+      --blue: #58a6ff;
+      --purple: #bc8cff;
+      --accent: #f0883e;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Navigation */
+    nav {
+      display: flex; justify-content: space-between; align-items: center;
+      max-width: 1100px; margin: 0 auto; padding: 20px 24px;
+    }
+    .logo { font-size: 20px; font-weight: 700; }
+    .logo span { color: var(--red); }
+    nav a { color: var(--muted); text-decoration: none; font-size: 14px; margin-left: 24px; }
+    nav a:hover { color: var(--text); }
+
+    /* Hero */
+    .hero {
+      max-width: 800px; margin: 80px auto 0; text-align: center; padding: 0 24px;
+    }
+    .hero h1 {
+      font-size: 52px; font-weight: 800; line-height: 1.1; letter-spacing: -1px;
+      margin-bottom: 20px;
+    }
+    .hero h1 span { background: linear-gradient(135deg, var(--green), var(--blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p {
+      font-size: 18px; color: var(--muted); max-width: 600px; margin: 0 auto 32px;
+    }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; padding: 14px 32px; border-radius: 8px;
+      font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(240,136,62,0.3); }
+    .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--muted); }
+
+    /* Demo terminal */
+    .demo-terminal {
+      max-width: 700px; margin: 60px auto; padding: 0 24px;
+    }
+    .terminal-window {
+      background: #0d1117; border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+    .terminal-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; background: #161b22; border-bottom: 1px solid var(--border);
+    }
+    .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .terminal-dot.r { background: #ff5f56; }
+    .terminal-dot.y { background: #ffbd2e; }
+    .terminal-dot.g { background: #27c93f; }
+    .terminal-body { padding: 20px 24px; font-size: 14px; line-height: 1.8; }
+    .terminal-body .prompt { color: var(--green); }
+    .terminal-body .comment { color: var(--muted); font-style: italic; }
+    .terminal-body .output { color: var(--blue); }
+    .terminal-body .output2 { color: var(--muted); }
+    .cursor-blink { animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Features */
+    .features {
+      max-width: 1100px; margin: 100px auto; padding: 0 24px;
+    }
+    .features h2 {
+      text-align: center; font-size: 32px; font-weight: 700; margin-bottom: 48px;
+    }
+    .grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+    }
+    .feature-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 28px; transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: var(--muted); }
+    .feature-card .icon { font-size: 28px; margin-bottom: 12px; }
+    .feature-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+    .feature-card p { font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+    /* How it works */
+    .how-it-works {
+      max-width: 900px; margin: 100px auto; padding: 0 24px;
+    }
+    .how-it-works h2 { text-align: center; font-size: 32px; font-weight: 700; margin-bottom: 48px; }
+    .steps { display: flex; flex-direction: column; gap: 24px; }
+    .step {
+      display: flex; gap: 20px; align-items: flex-start;
+    }
+    .step-num {
+      width: 40px; height: 40px; border-radius: 50%; background: var(--card);
+      border: 1px solid var(--border); display: flex; align-items: center;
+      justify-content: center; font-weight: 700; font-size: 16px; flex-shrink: 0;
+    }
+    .step-content { flex: 1; }
+    .step-content h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+    .step-content p { font-size: 14px; color: var(--muted); }
+    .step-content code {
+      background: rgba(88,166,255,0.1); color: var(--blue); padding: 2px 8px;
+      border-radius: 4px; font-size: 13px;
+    }
+
+    /* Pricing */
+    .pricing {
+      max-width: 900px; margin: 100px auto; padding: 0 24px;
+    }
+    .pricing h2 { text-align: center; font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+    .pricing .subtitle { text-align: center; color: var(--muted); margin-bottom: 48px; }
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+    .plan {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 28px; position: relative;
+    }
+    .plan.popular { border-color: var(--accent); }
+    .plan.popular::before {
+      content: 'Most Popular'; position: absolute; top: -12px; left: 50%;
+      transform: translateX(-50%); background: var(--accent); color: #000;
+      padding: 4px 14px; border-radius: 12px; font-size: 12px; font-weight: 600;
+    }
+    .plan-name { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+    .plan-price { font-size: 36px; font-weight: 800; margin-bottom: 4px; }
+    .plan-price small { font-size: 14px; font-weight: 400; color: var(--muted); }
+    .plan-desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+    .plan-features { list-style: none; margin-bottom: 24px; }
+    .plan-features li {
+      padding: 6px 0; font-size: 14px; display: flex; align-items: center; gap: 8px;
+    }
+    .plan-features li::before { content: '✓'; color: var(--green); font-weight: 700; }
+    .plan .btn { width: 100%; text-align: center; }
+
+    /* Footer */
+    footer {
+      text-align: center; padding: 40px 24px; color: var(--muted); font-size: 13px;
+      border-top: 1px solid var(--border); max-width: 1100px; margin: 60px auto 0;
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 32px; }
+      .grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">❤️ <span>Heartbeat</span> Monitor</div>
+    <div>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/dashboard.html">Dashboard</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Know the <span>second</span> your cron job fails</h1>
+    <p>Dead-simple monitoring for your scheduled tasks. Create a monitor, get a unique ping URL, add it to your script. If your job ever misses a beat, we'll tell you before it becomes a problem.</p>
+    <div class="hero-actions">
+      <a href="/dashboard.html" class="btn btn-primary">Create Free Monitor →</a>
+      <a href="#how-it-works" class="btn btn-secondary">How It Works</a>
+    </div>
+  </section>
+
+  <div class="demo-terminal">
+    <div class="terminal-window">
+      <div class="terminal-header">
+        <span class="terminal-dot r"></span>
+        <span class="terminal-dot y"></span>
+        <span class="terminal-dot g"></span>
+      </div>
+      <div class="terminal-body">
+        <div><span class="comment"># Step 1: Add this to your crontab</span></div>
+        <div><span class="prompt">$</span> <span>crontab -e</span></div>
+        <div>&nbsp;</div>
+        <div><span class="comment"># Step 2: Append &amp; ping after your job</span></div>
+        <div><span style="color:#ff7b72;">0 3 * * *</span> <span style="color:#79c0ff;">/backup.sh</span> <span style="color:#ffa657;">&&</span> <span style="color:#d2a8ff;">curl -s https://heartbeat.hermes.run/ping/a1b2c3d4</span></div>
+        <div>&nbsp;</div>
+        <div><span class="comment"># You'll get alerted if it doesn't ping within the grace period</span></div>
+        <div><span class="prompt">$</span> <span class="output">✅ Monitor created — you're covered.</span><span class="cursor-blink">▊</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="features" id="features">
+    <h2>Why developers ❤️ Heartbeat</h2>
+    <div class="grid">
+      <div class="feature-card">
+        <div class="icon">🔌</div>
+        <h3>One curl command</h3>
+        <p>No SDK, no agent, no daemon. Just append <code>&& curl https://heartbeat.run/ping/xxx</code> to your cron job. That's it.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔔</div>
+        <h3>Alerts where you work</h3>
+        <p>Email, Slack, Discord, or webhook. When your job fails, the alert finds you — not the other way around.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📊</div>
+        <h3>History & trends</h3>
+        <p>See when your jobs run, how long they take, and spot failure patterns before they become incidents.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">⏱️</div>
+        <h3>Custom grace periods</h3>
+        <p>Set per-monitor grace windows from 1 minute to 24 hours. No false alarms for jobs that just run slowly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔁</div>
+        <h3>Auto-recovery detection</h3>
+        <p>When a downed monitor starts pinging again, we send a recovery notification. You'll know the problem self-resolved.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">💰</div>
+        <h3>Free tier, always</h3>
+        <p>One monitor free forever. No credit card required. When you need more, upgrade for $9/month.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="how-it-works" id="how-it-works">
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Create a monitor</h3>
+          <p>Give it a name (e.g., "Daily Database Backup") and choose how long to wait before alerting.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Get your ping URL</h3>
+          <p>We give you a unique URL like <code>https://heartbeat.hermes.run/ping/a1b2c3d</code>. Add it to your script.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Add it to your cron job</h3>
+          <p>Append <code>&& curl -s https://heartbeat.run/ping/xxx</code> after your command. That's the whole setup.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>Get alerted if something breaks</h3>
+          <p>If your job doesn't ping back within the grace window, we'll alert you via email, Slack, or Discord — instantly.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing" id="pricing">
+    <h2>Simple pricing</h2>
+    <p class="subtitle">Free tier is free forever. Upgrade when you need more.</p>
+    <div class="pricing-grid">
+      <div class="plan">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">$0 <small>/mo</small></div>
+        <div class="plan-desc">For personal projects and occasional scripts</div>
+        <ul class="plan-features">
+          <li>1 monitor</li>
+          <li>7-day history</li>
+          <li>Email alerts</li>
+          <li>Public status check</li>
+        </ul>
+        <a href="/dashboard.html" class="btn btn-secondary">Get Started</a>
+      </div>
+      <div class="plan popular">
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">$9 <small>/mo</small></div>
+        <div class="plan-desc">For production systems and team workflows</div>
+        <ul class="plan-features">
+          <li>10 monitors</li>
+          <li>30-day history</li>
+          <li>Email + Slack + Discord alerts</li>
+          <li>SMS alerts (coming soon)</li>
+          <li>Team access</li>
+        </ul>
+        <a href="/dashboard.html" class="btn btn-primary">Coming Soon</a>
+      </div>
+      <div class="plan">
+        <div class="plan-name">Business</div>
+        <div class="plan-price">$29 <small>/mo</small></div>
+        <div class="plan-desc">For high-traffic services and multi-team setups</div>
+        <ul class="plan-features">
+          <li>50 monitors</li>
+          <li>1-year history</li>
+          <li>All alert channels</li>
+          <li>Webhook integrations</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="/dashboard.html" class="btn btn-secondary">Coming Soon</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>❤️ Heartbeat Monitor — cron job alerting that actually works.</p>
+    <p style="margin-top:8px;">Built by an AI, for developers who ship.</p>
+  </footer>
+</body>
+</html>

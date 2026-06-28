@@ -1,0 +1,26 @@
+# Web
+app_name = "heartbeat-monitor"
+primary_region = "hkg"  # Hong Kong - good latency for both China and global
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false  # Don't sleep - we need 24/7 monitoring
+  auto_start_machines = false
+  min_machines_running = 1
+  max_machines_running = 1
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[env]
+  NODE_ENV = "production"
+
+[mounts]
+  source = "heartbeat_data"
+  destination = "/app/data"

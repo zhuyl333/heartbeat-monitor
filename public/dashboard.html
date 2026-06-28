@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heartbeat Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --blue: #58a6ff;
+      --purple: #bc8cff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+    
+    /* Header */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+    }
+    .logo { font-size: 22px; font-weight: 700; }
+    .logo span { color: var(--red); }
+    .logo small { font-size: 12px; color: var(--muted); font-weight: 400; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 20px; font-size: 13px;
+      background: var(--card); border: 1px solid var(--border);
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    /* Stats row */
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px; text-align: center;
+    }
+    .stat-card .num { font-size: 28px; font-weight: 700; }
+    .stat-card .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* Create monitor form */
+    .create-section {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 20px; margin-bottom: 24px;
+    }
+    .create-section h3 { font-size: 14px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .form-row input {
+      flex: 1; min-width: 200px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 14px; color: var(--text); font-size: 14px;
+    }
+    .form-row input:focus { outline: none; border-color: var(--blue); }
+    .form-row select {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 14px; color: var(--text); font-size: 14px;
+    }
+    .btn {
+      background: var(--blue); color: #fff; border: none; border-radius: 6px;
+      padding: 10px 20px; font-size: 14px; cursor: pointer; font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-danger { background: var(--red); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    /* Monitor list */
+    .monitor-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px 20px; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .monitor-info { flex: 1; }
+    .monitor-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .monitor-meta { font-size: 12px; color: var(--muted); }
+    .monitor-meta code {
+      background: rgba(88,166,255,0.1); color: var(--blue); padding: 2px 6px;
+      border-radius: 4px; font-size: 11px;
+    }
+    .monitor-status { display: flex; align-items: center; gap: 8px; }
+    .monitor-actions { display: flex; gap: 8px; align-items: center; }
+    .status-tag {
+      padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
+    }
+    .status-tag.ok { background: rgba(63,185,80,0.15); color: var(--green); }
+    .status-tag.down { background: rgba(248,81,73,0.15); color: var(--red); }
+    .status-tag.pending { background: rgba(210,153,34,0.15); color: var(--yellow); }
+    .status-tag.paused { background: rgba(139,148,158,0.2); color: var(--muted); }
+
+    /* Toast notification */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 20px; font-size: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      transform: translateY(100px); opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 100;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: var(--green); }
+    .toast.error { border-color: var(--red); }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; color: var(--text); margin-bottom: 8px; }
+    .empty-state p { font-size: 14px; }
+
+    @media (max-width: 600px) {
+      .stats { grid-template-columns: 1fr; }
+      .monitor-card { flex-direction: column; align-items: stretch; }
+      .monitor-actions { justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">❤️ <span>Heartbeat</span> <small>Monitor</small></div>
+      <div class="status-badge">
+        <span class="status-dot green" id="serviceDot"></span>
+        <span id="serviceStatus">Connected</span>
+      </div>
+    </header>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="num" id="totalMonitors">0</div>
+        <div class="label">Total Monitors</div>
+      </div>
+      <div class="stat-card">
+        <div class="num" id="activeMonitors">0</div>
+        <div class="label">Active</div>
+      </div>
+      <div class="stat-card">
+        <div class="num" id="downMonitors">0</div>
+        <div class="label">Down</div>
+      </div>
+    </div>
+
+    <div class="create-section">
+      <h3>📡 New Monitor</h3>
+      <div class="form-row">
+        <input type="text" id="monitorName" placeholder="e.g. Database Backup" />
+        <select id="gracePeriod">
+          <option value="60">1 min</option>
+          <option value="300" selected>5 min</option>
+          <option value="600">10 min</option>
+          <option value="1800">30 min</option>
+          <option value="3600">1 hour</option>
+        </select>
+        <button class="btn" onclick="createMonitor()">Create</button>
+      </div>
+    </div>
+
+    <div id="monitorList">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">📡</div>
+        <h3>No monitors yet</h3>
+        <p>Create your first monitor above, then add its ping URL to your cron job.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = '/api';
+
+    async function api(path, options = {}) {
+      const res = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        ...options,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast ' + type + ' show';
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function timeAgo(dateStr) {
+      if (!dateStr) return 'never';
+      const ms = Date.now() - new Date(dateStr + 'Z').getTime();
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's ago';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ago';
+      return Math.floor(m / 60) + 'h ago';
+    }
+
+    function getStatus(pings, grace, paused) {
+      if (paused) return 'paused';
+      if (!pings || pings.length === 0) return 'pending';
+      const lastPing = new Date(pings[0].received_at + 'Z');
+      const elapsed = (Date.now() - lastPing.getTime()) / 1000;
+      return elapsed > grace ? 'down' : 'ok';
+    }
+
+    async function loadMonitors() {
+      try {
+        const [status, monitors] = await Promise.all([
+          api('/status'),
+          api('/monitors'),
+        ]);
+
+        document.getElementById('totalMonitors').textContent = status.monitors.total;
+        document.getElementById('activeMonitors').textContent = status.monitors.active;
+
+        const container = document.getElementById('monitorList');
+        const empty = document.getElementById('emptyState');
+
+        if (monitors.length === 0) {
+          container.innerHTML = '';
+          container.appendChild(empty);
+          empty.style.display = 'block';
+          return;
+        }
+        empty.style.display = 'none';
+
+        // Fetch pings for all monitors
+        const pingsMap = {};
+        await Promise.all(monitors.map(async (m) => {
+          try {
+            const pings = await api(`/monitors/${m.id}/pings?limit=1`);
+            pingsMap[m.id] = pings;
+          } catch (e) { pingsMap[m.id] = []; }
+        }));
+
+        let downCount = 0;
+        let html = '';
+        for (const m of monitors) {
+          const status = getStatus(pingsMap[m.id], m.grace_seconds, m.is_paused);
+          if (status === 'down') downCount++;
+
+          const lastPing = pingsMap[m.id]?.[0];
+          const lastPingStr = lastPing ? timeAgo(lastPing.received_at) : 'never';
+
+          html += `
+            <div class="monitor-card" data-id="${m.id}">
+              <div class="monitor-info">
+                <div class="monitor-name">${escHtml(m.name)}</div>
+                <div class="monitor-meta">
+                  Ping URL: <code>${window.location.origin}/ping/${m.slug}</code>
+                  &middot; Grace: ${m.grace_seconds}s &middot; Last: ${lastPingStr}
+                </div>
+              </div>
+              <div class="monitor-actions">
+                <span class="status-tag ${status}">${status}</span>
+                <button class="btn btn-sm ${m.is_paused ? 'btn' : 'btn-sm'}" 
+                  onclick="togglePause('${m.id}', ${m.is_paused})">
+                  ${m.is_paused ? '▶ Resume' : '⏸ Pause'}
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteMonitor('${m.id}', '${escHtml(m.name)}')">
+                  ✕
+                </button>
+              </div>
+            </div>
+          `;
+        }
+        document.getElementById('downMonitors').textContent = downCount;
+        container.innerHTML = html;
+
+      } catch (err) {
+        console.error('Load error:', err);
+        showToast('Failed to load monitors: ' + err.message, 'error');
+      }
+    }
+
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    async function createMonitor() {
+      const name = document.getElementById('monitorName').value.trim();
+      if (!name) { showToast('Please enter a monitor name', 'error'); return; }
+
+      try {
+        const result = await api('/monitors', {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            grace_seconds: parseInt(document.getElementById('gracePeriod').value),
+          }),
+        });
+        document.getElementById('monitorName').value = '';
+        showToast(`✅ Monitor "${result.name}" created!`);
+        await loadMonitors();
+
+        // Copy ping URL to clipboard
+        const pingUrl = window.location.origin + result.ping_url;
+        try {
+          await navigator.clipboard.writeText(pingUrl);
+          showToast(`✅ Created! Ping URL copied to clipboard: ${pingUrl}`, 'success');
+        } catch (e) {
+          showToast(`✅ Created! Ping URL: ${pingUrl}`, 'success');
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function togglePause(id, currentlyPaused) {
+      try {
+        await api(`/monitors/${id}/pause`, { method: 'PATCH' });
+        showToast(currentlyPaused ? '▶ Resumed' : '⏸ Paused');
+        await loadMonitors();
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function deleteMonitor(id, name) {
+      if (!confirm(`Delete monitor "${name}"? This cannot be undone.`)) return;
+      try {
+        await api(`/monitors/${id}`, { method: 'DELETE' });
+        showToast(`Deleted "${name}"`);
+        await loadMonitors();
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    // Auto-refresh every 15 seconds
+    loadMonitors();
+    setInterval(loadMonitors, 15000);
+  </script>
+</body>
+</html>
