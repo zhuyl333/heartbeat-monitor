@@ -145,9 +145,9 @@ Now you can distinguish between "the job crashed" (no ping at all) and "the job 
 
 ---
 
-## Production Checklist for Backup Monitoring
+## Production Checklist for Backup Script Monitoring
 
-Use this checklist to bulletproof your backup monitoring:
+Use this checklist to bulletproof your backup script monitoring:
 
 - [ ] **Use `set -euo pipefail`** in every backup script — stop on first error.
 - [ ] **Add a heartbeat ping** at the end of each script — only on success.
