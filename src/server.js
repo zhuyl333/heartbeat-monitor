@@ -251,6 +251,48 @@ app.get('/check/:slug', (req, res) => {
 });
 
 // ============================================================
+// Feedback API
+// ============================================================
+
+/**
+ * POST /api/feedback - Submit user feedback
+ */
+app.post('/api/feedback', (req, res) => {
+  const { email, message, page } = req.body;
+
+  if (!message || typeof message !== 'string' || message.trim().length === 0) {
+    return res.status(400).json({ error: 'message is required' });
+  }
+
+  db.run(
+    'INSERT INTO feedback (email, message, page) VALUES (?, ?, ?)',
+    [email || null, message.trim(), page || null]
+  );
+
+  res.status(201).json({ status: 'ok', message: 'Feedback received. Thank you!' });
+});
+
+/**
+ * GET /api/feedback - List feedback (admin, no auth for MVP)
+ */
+app.get('/api/feedback', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const feedback = db.all(
+    'SELECT * FROM feedback ORDER BY created_at DESC LIMIT ?',
+    [limit]
+  );
+  res.json(feedback);
+});
+
+/**
+ * PATCH /api/feedback/:id/read - Mark feedback as read
+ */
+app.patch('/api/feedback/:id/read', (req, res) => {
+  db.run("UPDATE feedback SET read = 1 WHERE id = ?", [req.params.id]);
+  res.json({ status: 'ok' });
+});
+
+// ============================================================
 // Start Server (async init first)
 // ============================================================
 

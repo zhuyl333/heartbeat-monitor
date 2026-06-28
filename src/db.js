@@ -89,6 +89,18 @@ function createTables() {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT,
+      message TEXT NOT NULL,
+      page TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      read INTEGER DEFAULT 0,
+      replied INTEGER DEFAULT 0
+    )
+  `);
+
   // Create indexes
   try { db.run('CREATE INDEX IF NOT EXISTS idx_pings_monitor ON pings(monitor_id)'); } catch(e) {}
   try { db.run('CREATE INDEX IF NOT EXISTS idx_pings_time ON pings(received_at)'); } catch(e) {}

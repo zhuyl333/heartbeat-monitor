@@ -125,6 +125,32 @@
     .empty-state h3 { font-size: 18px; color: var(--text); margin-bottom: 8px; }
     .empty-state p { font-size: 14px; }
 
+    /* Feedback widget */
+    .feedback-btn {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--blue); color: #fff; border: none; border-radius: 50%;
+      width: 48px; height: 48px; font-size: 20px; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100;
+      transition: transform 0.2s;
+    }
+    .feedback-btn:hover { transform: scale(1.1); }
+    .feedback-modal {
+      position: fixed; bottom: 80px; right: 20px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px; width: 320px; z-index: 101;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: none;
+    }
+    .feedback-modal.show { display: block; }
+    .feedback-modal h3 { font-size: 14px; margin-bottom: 8px; color: var(--muted); }
+    .feedback-modal input, .feedback-modal textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 13px;
+      margin-bottom: 8px; resize: vertical;
+    }
+    .feedback-modal textarea { min-height: 80px; }
+    .feedback-modal .btn { width: 100%; }
+
     @media (max-width: 600px) {
       .stats { grid-template-columns: 1fr; }
       .monitor-card { flex-direction: column; align-items: stretch; }
@@ -182,6 +208,15 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- Feedback widget -->
+  <button class="feedback-btn" onclick="toggleFeedback()" title="Feedback / Report Issue">💬</button>
+  <div class="feedback-modal" id="feedbackModal">
+    <h3>💬 Feedback / Report an Issue</h3>
+    <input type="email" id="feedbackEmail" placeholder="Your email (optional)" />
+    <textarea id="feedbackMessage" placeholder="Describe your issue, suggestion, or question..."></textarea>
+    <button class="btn" onclick="submitFeedback()">Send Feedback</button>
+  </div>
 
   <script>
     const API = '/api';
@@ -350,6 +385,34 @@
     // Auto-refresh every 15 seconds
     loadMonitors();
     setInterval(loadMonitors, 15000);
+
+    // Feedback functions
+    function toggleFeedback() {
+      const m = document.getElementById('feedbackModal');
+      m.classList.toggle('show');
+    }
+
+    async function submitFeedback() {
+      const message = document.getElementById('feedbackMessage').value.trim();
+      if (!message) { showToast('Please write a message', 'error'); return; }
+
+      try {
+        await api('/feedback', {
+          method: 'POST',
+          body: JSON.stringify({
+            message,
+            email: document.getElementById('feedbackEmail').value.trim() || null,
+            page: window.location.pathname,
+          }),
+        });
+        document.getElementById('feedbackMessage').value = '';
+        document.getElementById('feedbackEmail').value = '';
+        document.getElementById('feedbackModal').classList.remove('show');
+        showToast('✅ Feedback received. Thank you!');
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
   </script>
 </body>
 </html>
