@@ -48,3 +48,4 @@ Requires [Fly.io](https://fly.io) account.
 ## License
 
 MIT
+# Railway deploy trigger
